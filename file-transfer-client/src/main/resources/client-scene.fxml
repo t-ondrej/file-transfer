@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.jfoenix.controls.JFXButton?>
+<?import com.jfoenix.controls.JFXProgressBar?>
+<?import com.jfoenix.controls.JFXSlider?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.VBox?>
+
+<Pane prefHeight="357.0" prefWidth="734.0" style="-fx-background-color: #ecf0f1;" stylesheets="@client-scene.css" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sk.upjs.ics.ui.controllers.ClientSceneController">
+   <children>
+      <VBox alignment="TOP_CENTER" prefHeight="357.0" prefWidth="734.0">
+         <children>
+            <HBox alignment="CENTER" prefHeight="66.0" prefWidth="734.0">
+               <children>
+                  <Label fx:id="directoryLabel" text="No directory selected " />
+                  <JFXButton fx:id="chooseDirectoryButton" minWidth="160.0" onAction="#onChooseDirectoryClicked" prefHeight="30.0" prefWidth="166.0" ripplerFill="WHITE" styleClass="choose-directory-jfx-button" text="Choose directory">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></JFXButton>
+               </children>
+            </HBox>
+            <HBox alignment="CENTER" prefHeight="100.0" prefWidth="200.0">
+               <children>
+                  <Label text="Number of sockets:">
+                     <padding>
+                        <Insets right="10.0" />
+                     </padding>
+                     <opaqueInsets>
+                        <Insets />
+                     </opaqueInsets>
+                     <HBox.margin>
+                        <Insets bottom="5.0" />
+                     </HBox.margin>
+                  </Label>
+                  <JFXSlider fx:id="socketCountSlider" blockIncrement="1.0" majorTickUnit="2.0" max="10.0" minorTickCount="1" snapToTicks="true" value="5.0" />
+               </children>
+            </HBox>
+            <HBox alignment="CENTER" prefHeight="103.0" prefWidth="734.0">
+               <children>
+                  <JFXButton onAction="#onStartButtonClicked" ripplerFill="BLACK" styleClass="state-jfx-button" text="Start">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></JFXButton>
+                  <JFXButton fx:id="pauseButton" disable="true" onAction="#onPauseButtonClicked" styleClass="state-jfx-button" text="Pause">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></JFXButton>
+                  <JFXButton fx:id="resumeButton" disable="true" onAction="#onResumeButtonClicked" styleClass="state-jfx-button" text="Resume">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></JFXButton>
+                  <JFXButton fx:id="cancelButton" disable="true" onAction="#onCancelButtonClicked" styleClass="state-jfx-button" text="Cancel">
+                     <cursor>
+                        <Cursor fx:constant="HAND" />
+                     </cursor></JFXButton>
+               </children>
+            </HBox>
+            <JFXProgressBar fx:id="progressBar" />
+            <Label fx:id="timeLabel" text="0:00">
+               <VBox.margin>
+                  <Insets top="10.0" />
+               </VBox.margin>
+            </Label>
+         </children>
+         <padding>
+            <Insets top="15.0" />
+         </padding>
+      </VBox>
+   </children>
+</Pane>
