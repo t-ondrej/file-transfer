@@ -1,5 +1,6 @@
 package sk.upjs.ics.tasks;
 
+import org.apache.log4j.Logger;
 import sk.upjs.ics.CommunicationBase;
 import sk.upjs.ics.commons.Dialect;
 import sk.upjs.ics.file.FileAccessor;
@@ -19,73 +20,70 @@ public class RequestFileTask extends CommunicationBase implements Callable<Boole
 
     FileAccessor fileAccessor;
     BlockingQueue<FileChunk> chunks;
-    BlockingQueue<FileChunk> written;
 
-    public RequestFileTask(FileAccessor fileAccessor, Socket socket, BlockingQueue<FileChunk> chunks,  BlockingQueue<FileChunk> written) {
+    public RequestFileTask(FileAccessor fileAccessor, Socket socket, BlockingQueue<FileChunk> chunks) {
         this.fileAccessor = fileAccessor;
         this.chunks = chunks;
-        this.written = written;
+
+        logger = Logger.getLogger(getClass());
 
         try {
             dis = new DataInputStream(socket.getInputStream());
             dos = new DataOutputStream(socket.getOutputStream());
+            requestListening();
         } catch (IOException e) {
             closeDataStreams();
-            e.printStackTrace();
+            logger.error(e);
         }
-
-        requestListening();
     }
 
     @Override
     public Boolean call() throws Exception {
-        while (true) {
-            if (Thread.currentThread().isInterrupted()) {
-                return false;
-            }
+        boolean s = true;
+        try {
+            while (true) {
 
-            try {
+                if (Thread.currentThread().isInterrupted()) {
+                    s = false;
+                    break;
+                }
 
+            //    System.out.println("1");
                 FileChunk chunk = chunks.take();
 
                 if (chunk.isPoisonPill()) {
-                    //   fileAccessor.close();
                     return true;
                 }
-
+              //  System.out.println("2");
                 requestFileChunk(chunk);
-
+              //  System.out.println("3");
                 byte[] buffer = new byte[chunk.getLength()];
                 dis.read(buffer, 0, chunk.getLength());
-                System.out.println("RECEIVER: Received " + chunk.getOffset() + " chunk");
-
+              //  System.out.println("4");
                 fileAccessor.write(chunk.getOffset(), buffer);
-                written.offer(chunk);
-                System.out.println("RECEIVER: Wrote " + chunk.getOffset() + " chunk");
-            } catch (InterruptedException e) {
+            //    System.out.println("5");
             }
+
+        } finally {
+            closeDataStreams();
+            fileAccessor.close();
         }
+
+        return s;
     }
 
-    private void requestListening() {
-        try {
-            dos.writeUTF(Dialect.REQUEST_LISTENING);
-            dos.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        System.out.println("Client requested listening");
+    private void requestListening() throws IOException {
+        dos.writeUTF(Dialect.REQUEST_LISTENING);
+        dos.flush();
+
+     //   logger.info("RECEIVER: Requested listening " + Thread.currentThread().getName());
     }
 
-    private void requestFileChunk(FileChunk chunk) {
-        try {
-            dos.writeInt(chunk.getOffset());
-            dos.writeInt(chunk.getLength());
-            dos.flush();
+    private void requestFileChunk(FileChunk chunk) throws IOException {
+        dos.writeInt(chunk.getOffset());
+        dos.writeInt(chunk.getLength());
+        dos.flush();
 
-            System.out.println("RECEIVER: Requested " + chunk.getOffset() + " chunk");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+      //  logger.info("RECEIVER: Requested " + chunk.getOffset() + " chunk");
     }
 }

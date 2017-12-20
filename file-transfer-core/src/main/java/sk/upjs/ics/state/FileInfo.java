@@ -19,12 +19,20 @@ public class FileInfo {
         this.startingOffset = startingOffset;
     }
 
+    protected FileInfo() {
+
+    }
+
     public String getDirectory() {
         return directory;
     }
 
     public String getFileName() {
         return fileName;
+    }
+
+    public String getFullPath() {
+        return getDirectory() + getFileName();
     }
 
     public long getFileLength() {
@@ -37,5 +45,15 @@ public class FileInfo {
 
     public int getStartingOffset() {
         return startingOffset;
+    }
+
+    @Override public String toString() {
+        return "FileInfo{" +
+                "directory='" + directory + '\'' +
+                ", fileName='" + fileName + '\'' +
+                ", fileLength=" + fileLength +
+                ", chunkSize=" + chunkSize +
+                ", startingOffset=" + startingOffset +
+                '}';
     }
 }

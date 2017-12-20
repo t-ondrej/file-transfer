@@ -41,7 +41,7 @@
             </HBox>
             <HBox alignment="CENTER" prefHeight="103.0" prefWidth="734.0">
                <children>
-                  <JFXButton onAction="#onStartButtonClicked" ripplerFill="BLACK" styleClass="state-jfx-button" text="Start">
+                  <JFXButton fx:id="startButton" onAction="#onStartButtonClicked" ripplerFill="BLACK" styleClass="state-jfx-button" text="Start">
                      <cursor>
                         <Cursor fx:constant="HAND" />
                      </cursor></JFXButton>

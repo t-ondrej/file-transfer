@@ -7,17 +7,15 @@ import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import org.apache.log4j.Logger;
 import sk.upjs.ics.TransferModule;
 import sk.upjs.ics.ui.controllers.ClientSceneController;
 
-import java.util.logging.Logger;
 
 /**
  * Created by Tomas on 9.12.2017.
  */
 public class FileClientStage extends Application {
-
-    private ClientSceneController clientSceneController;
 
     public static void main(String[] args) {
         launch(args);
@@ -25,7 +23,7 @@ public class FileClientStage extends Application {
 
     @Override
     public void start(Stage primaryStage) throws Exception {
-        Logger logger = Logger.getLogger(FileClientStage.class.getName());
+        Logger logger = Logger.getLogger(getClass());
         logger.info("Starting client GUI...");
 
         Injector injector = Guice.createInjector(new TransferModule());
@@ -34,7 +32,7 @@ public class FileClientStage extends Application {
         loader.setControllerFactory(injector::getInstance);
         loader.setLocation(getClass().getResource("/client-scene.fxml"));
         Scene scene = new Scene(loader.load());
-        clientSceneController = loader.getController();
+        ClientSceneController clientSceneController = loader.getController();
         clientSceneController.setCurrentStage(primaryStage);
 
         primaryStage.setScene(scene);

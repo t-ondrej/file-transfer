@@ -1,9 +1,10 @@
 package sk.upjs.ics;
 
+import org.apache.log4j.Logger;
+
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.logging.Logger;
 
 /**
  * Created by Tomas on 9.12.2017.
@@ -23,6 +24,9 @@ public abstract class CommunicationBase {
                 dos.close();
         } catch (IOException e) {
             e.printStackTrace();
+            logger.error(e);
         }
+
+        logger.info("Closing data streams for " + Thread.currentThread().getName());
     }
 }

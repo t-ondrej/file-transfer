@@ -1,5 +1,6 @@
 package sk.upjs.ics.state;
 
+import org.apache.log4j.Logger;
 import sk.upjs.ics.file.FileChunkRegistry;
 
 /**
@@ -9,14 +10,29 @@ public class TransferState extends FileInfo {
 
     private int socketCount;
     private int serverTransferPort;
-    private boolean isPaused;
     private int elapsed;
 
     private FileChunkRegistry chunksRegistry;
 
-    public TransferState(String directory, String fileName, long fileLength, int chunkSize, int startingOffset, int elapsed) {
+    private Logger logger = Logger.getLogger(getClass());
+
+    public static TransferState createDefault() {
+        return new TransferState();
+    }
+
+    private TransferState() {
+        super();
+    }
+
+    public TransferState(String directory, String fileName, long fileLength,
+                         int chunkSize, int startingOffset, int elapsed,
+                         int socketCount, int serverTransferPort) {
         super(directory, fileName, fileLength, chunkSize, startingOffset);
         this.elapsed = elapsed;
+        this.socketCount = socketCount;
+        this.serverTransferPort = serverTransferPort;
+
+        logger.info("CREATED STATE: "+ this.toString());
     }
 
     public int getFirstUnreadOffset() {
@@ -27,30 +43,16 @@ public class TransferState extends FileInfo {
         return socketCount;
     }
 
-    public void setSocketCount(int socketCount) {
-        chunksRegistry.addPoisonPills(socketCount - this.socketCount);
-        this.socketCount = socketCount;
-    }
-
     public int getServerTransferPort() {
         return serverTransferPort;
     }
 
-    public void setServerTransferPort(int serverTransferPort) {
-        this.serverTransferPort = serverTransferPort;
-    }
-
     public double getProgress() {
+        if (chunksRegistry == null)
+            return 0;
+
         return (chunksRegistry.getTotalChunks() - chunksRegistry.getChunksLeft())
                 / (double) chunksRegistry.getTotalChunks();
-    }
-
-    public boolean isPaused() {
-        return isPaused;
-    }
-
-    public void setPaused(boolean paused) {
-        isPaused = paused;
     }
 
     public void setChunksRegistry(FileChunkRegistry chunksRegistry) {
@@ -63,5 +65,14 @@ public class TransferState extends FileInfo {
 
     public int getElapsed() {
         return elapsed;
+    }
+
+    @Override public String toString() {
+        return "TransferState{" +
+                "socketCount=" + socketCount +
+                ", serverTransferPort=" + serverTransferPort +
+                ", elapsed=" + elapsed +
+                ", chunksRegistry=" + chunksRegistry +
+                '}';
     }
 }

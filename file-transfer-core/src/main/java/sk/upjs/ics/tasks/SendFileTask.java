@@ -1,5 +1,6 @@
 package sk.upjs.ics.tasks;
 
+import org.apache.log4j.Logger;
 import sk.upjs.ics.CommunicationBase;
 import sk.upjs.ics.file.FileAccessor;
 
@@ -19,47 +20,42 @@ public class SendFileTask extends CommunicationBase implements Callable<Void> {
 
     public SendFileTask(FileAccessor fileAccessor, Socket socket) {
         this.fileAccesor = fileAccessor;
+        logger = Logger.getLogger(getClass());
 
         try {
             dis = new DataInputStream(socket.getInputStream());
             dos = new DataOutputStream(socket.getOutputStream());
         } catch (IOException e) {
             closeDataStreams();
-            e.printStackTrace();
+            logger.error(e);
         }
     }
 
     public Void call() throws Exception {
-        System.out.println("Started sender");
-        while (true) {
+        try {
+            while (true) {
 
-            if (Thread.currentThread().isInterrupted()) {
-                System.out.println("Stopped sender");
-                break;
+                if (Thread.currentThread().isInterrupted()) {
+                    logger.info("Sender cancellled");
+                    break;
+                }
+
+                int offset = dis.readInt();
+                int length = dis.readInt();
+
+                byte[] buffer = fileAccesor.read(offset, length);
+
+                sendData(buffer);
             }
-
-            int offset = dis.readInt();
-            int length = dis.readInt();
-
-            System.out.println("SENDER: Received request for " + offset + " chunk");
-
-            byte[] buffer = fileAccesor.read(offset, length);
-            System.out.println("SENDER: Read " + offset + " chunk");
-
-            sendData(buffer);
-            System.out.println("SENDER: Sent " + offset + " chunk");
+        } finally {
+            closeDataStreams();
         }
 
         return null;
     }
 
-    private void sendData(byte[] buffer) {
-        try {
-            dos.write(buffer);
-            dos.flush();
-        } catch (IOException e) {
-            closeDataStreams();
-            logger.info("SERVER: Closing data streams");
-        }
+    private void sendData(byte[] buffer) throws IOException {
+        dos.write(buffer);
+        dos.flush();
     }
 }

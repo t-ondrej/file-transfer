@@ -12,8 +12,10 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
+import org.apache.log4j.Logger;
 import sk.upjs.ics.FileClient;
 import sk.upjs.ics.utils.Time;
+import sun.rmi.runtime.Log;
 
 import java.io.File;
 import java.net.URL;
@@ -26,7 +28,7 @@ import java.util.TimerTask;
  */
 public class ClientSceneController implements Initializable {
 
-
+    @FXML private JFXButton startButton;
     @FXML private JFXButton chooseDirectoryButton;
     @FXML private JFXSlider socketCountSlider;
     @FXML private ProgressBar progressBar;
@@ -40,6 +42,8 @@ public class ClientSceneController implements Initializable {
     private FileClient fileClient;
     private Timer timer;
 
+    private Logger logger = Logger.getLogger(getClass());
+
     @Inject
     public ClientSceneController(FileClient fileClient) {
         this.fileClient = fileClient;
@@ -47,9 +51,8 @@ public class ClientSceneController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        prepareComponents();
+        initComponents();
         progressBar.setProgress(fileClient.getProgress());
-        addTimerSchedule();
     }
 
     public void setCurrentStage(Stage currentStage) {
@@ -58,15 +61,10 @@ public class ClientSceneController implements Initializable {
 
     @FXML
     private void onStartButtonClicked() {
-        resumeButton.setDisable(true);
-        pauseButton.setDisable(false);
-        cancelButton.setDisable(false);
-
+        updateComponentsStarted();
         int socketCount = (int)socketCountSlider.getValue();
 
-        socketCountSlider.setDisable(true);
-
-        System.out.println("GUI: added timer");
+        logger.info("GUI: timer added");
 
         Service<Boolean> downloadService = new Service<Boolean>() {
             protected Task<Boolean> createTask() {
@@ -78,26 +76,25 @@ public class ClientSceneController implements Initializable {
             }
         };
 
-        System.out.println("GUI: created service");
+        addTimerSchedule();
+
+        logger.info("GUI: download service created");
 
         downloadService.setOnSucceeded((event) -> {
+            if (downloadService.getValue())
+                updateComponentsDefault();
+            progressBar.setProgress(fileClient.getProgress());
             timer.cancel();
-
-            //if ((boolean) event.getSource().getValue())
         });
 
-      //  downloadService.set
-
-        System.out.println("GUI: onSucceeded set");
+        logger.info("GUI: download service onSucceded set");
 
         downloadService.start();
     }
 
     @FXML
     private void onPauseButtonClicked() {
-        timer.cancel();
-        pauseButton.setDisable(true);
-        resumeButton.setDisable(false);
+        updateComponentsPaused();
 
         new Service<Void>() {
             protected Task<Void> createTask() {
@@ -114,9 +111,7 @@ public class ClientSceneController implements Initializable {
     @FXML
     private void onResumeButtonClicked() {
         addTimerSchedule();
-        pauseButton.setDisable(false);
-        cancelButton.setDisable(false);
-        resumeButton.setDisable(true);
+        updateComponentsResumed();
 
         new Service<Void>() {
             protected Task<Void> createTask() {
@@ -133,12 +128,16 @@ public class ClientSceneController implements Initializable {
 
     @FXML
     private void onCancelButtonClicked() {
-        timer.cancel();
+        if (timer != null)
+            timer.cancel();
+
+        updateComponentsCancelled();
 
         new Service<Void>() {
             protected Task<Void> createTask() {
                 return new Task<Void>() {
                     protected Void call() throws Exception {
+                        logger.info("GUI: cancelled");
                         fileClient.cancelDownloading();
                         return null;
                     }
@@ -155,7 +154,6 @@ public class ClientSceneController implements Initializable {
         if (selectedDirectory == null) {
             directoryLabel.setText("No directory selected ");
         } else {
-
             directoryLabel.setText(selectedDirectory.getAbsolutePath() + " ");
         }
     }
@@ -165,6 +163,12 @@ public class ClientSceneController implements Initializable {
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
+                if (fileClient.getProgress() >= 1)
+                    return;
+
+                if (fileClient.getElapsed() % 10 == 0)
+                    logger.info((fileClient.getProgress() * 100) + " %");
+
                 Platform.runLater(() -> {
                     progressBar.setProgress(fileClient.getProgress());
                     timeLabel.setText(Time.fromSeconds(fileClient.addAndGetElapsed()));
@@ -173,12 +177,61 @@ public class ClientSceneController implements Initializable {
         }, 0, 1000);
     }
 
-    private void prepareComponents() {
+    private void initComponents() {
         if (fileClient.resumeAvailable()) {
-            resumeButton.setDisable(false);
+            updateComponentsPaused();
+
             directoryLabel.setText(fileClient.getFileInfo().getDirectory());
+            socketCountSlider.setDisable(true);
             chooseDirectoryButton.setDisable(true);
-            timeLabel.setText(Time.fromSeconds(fileClient.addAndGetElapsed() - 1));
+            timeLabel.setText(Time.fromSeconds(fileClient.getElapsed()));
         }
+    }
+
+    private void updateComponentsStarted() {
+        socketCountSlider.setDisable(true);
+
+        startButton.setDisable(true);
+        pauseButton.setDisable(false);
+        resumeButton.setDisable(true);
+        cancelButton.setDisable(false);
+
+        chooseDirectoryButton.setDisable(true);
+        socketCountSlider.setDisable(true);
+    }
+
+    private void updateComponentsPaused() {
+        if (timer != null)
+            timer.cancel();
+
+        startButton.setDisable(false);
+        pauseButton.setDisable(true);
+        resumeButton.setDisable(false);
+        cancelButton.setDisable(false);
+    }
+
+    private void updateComponentsResumed() {
+        startButton.setDisable(true);
+        pauseButton.setDisable(false);
+        resumeButton.setDisable(true);
+        cancelButton.setDisable(false);
+    }
+
+    private void updateComponentsCancelled() {
+        directoryLabel.setText("No directory selected");
+        timeLabel.setText(Time.fromSeconds(0));
+        progressBar.setProgress(0);
+
+        startButton.setDisable(false);
+        pauseButton.setDisable(true);
+        resumeButton.setDisable(true);
+        cancelButton.setDisable(true);
+
+        chooseDirectoryButton.setDisable(false);
+        socketCountSlider.setDisable(false);
+    }
+
+    private void updateComponentsDefault() {
+        updateComponentsCancelled();
     }
 }

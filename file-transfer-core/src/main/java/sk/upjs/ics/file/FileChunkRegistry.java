@@ -1,5 +1,6 @@
 package sk.upjs.ics.file;
 
+import org.apache.log4j.Logger;
 import sk.upjs.ics.state.TransferState;
 
 import java.util.concurrent.BlockingQueue;
@@ -12,9 +13,9 @@ public class FileChunkRegistry {
 
     private BlockingQueue<FileChunk> fileChunks;
 
-    private BlockingQueue<FileChunk> writtenChunks;
-
     private int totalChunks;
+
+    private Logger logger = Logger.getLogger(getClass());
 
     public FileChunkRegistry(int fileLength, int chunkSize) {
         fileChunks = createFileChunks(fileLength, chunkSize);
@@ -25,7 +26,7 @@ public class FileChunkRegistry {
                                                                     state.getChunkSize());
 
         fileChunkRegistry.fileChunks.removeIf(chunk -> chunk.getOffset() <= state.getStartingOffset());
-        fileChunkRegistry.writtenChunks = new LinkedBlockingDeque<>();
+        fileChunkRegistry.addPoisonPills(state.getSocketCount());
         state.setChunksRegistry(fileChunkRegistry);
 
         return fileChunkRegistry;
@@ -33,10 +34,6 @@ public class FileChunkRegistry {
 
     public BlockingQueue<FileChunk> getFileChunks() {
         return fileChunks;
-    }
-
-    public BlockingQueue<FileChunk> getWritten() {
-        return writtenChunks;
     }
 
     public void addPoisonPills(int pillsCount) {
@@ -74,7 +71,10 @@ public class FileChunkRegistry {
 
         if (fileResidue > 0)
             chunks.add(new FileChunk(fileChunkCount * chunkSize, fileResidue));
+
         totalChunks = chunks.size();
+
+        logger.info("File chunks created");
         return chunks;
     }
 }

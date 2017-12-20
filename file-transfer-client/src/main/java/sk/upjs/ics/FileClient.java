@@ -1,6 +1,7 @@
 package sk.upjs.ics;
 
 import com.google.inject.Inject;
+import org.apache.log4j.Logger;
 import sk.upjs.ics.commons.Config;
 import sk.upjs.ics.commons.Dialect;
 import sk.upjs.ics.file.FileAccessor;
@@ -16,10 +17,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.logging.Logger;
 
 public class FileClient extends CommunicationBase {
 
@@ -35,12 +34,13 @@ public class FileClient extends CommunicationBase {
     @Inject
     public FileClient(StateManager stateManager) {
         this.stateManager = stateManager;
-        logger = Logger.getLogger(FileClient.class.getName());
-        openConnection();
+        logger = Logger.getLogger(getClass());
 
         if (stateManager.existsPrevious()) {
             state = stateManager.getLastState();
             chunkRegistry = FileChunkRegistry.fromState(state);
+        } else {
+            state = TransferState.createDefault();
         }
     }
 
@@ -53,40 +53,12 @@ public class FileClient extends CommunicationBase {
      * @return true if the download succeded
      */
     public boolean startDownloading(int socketCount, String directory) {
-        if (sockets.size() < 0) return true;
-
+        openConnection();
         requestInfo();
         waitAndProcessInfo(socketCount, directory);
         openSockets();
 
-        CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executorService);
-
-        sockets.forEach(socket ->
-                futures.add(completionService.submit(new RequestFileTask(fileAccessor,
-                        socket,
-                        chunkRegistry.getFileChunks(),
-                        chunkRegistry.getWritten())))
-        );
-
-        boolean successfullyDownloaded = true;
-
-        for (int i = 0; i < socketCount; i++) {
-            try {
-                Future<Boolean> done = completionService.take();
-
-                if (!done.get()) {
-                    successfullyDownloaded = false;
-                    break;
-                }
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        }
-
-        fileAccessor.close();
-        freeAllResources();
-
-        return successfullyDownloaded;
+        return submitTasksAndAwait();
     }
 
     /**
@@ -95,13 +67,10 @@ public class FileClient extends CommunicationBase {
      * Free all resources
      */
     public void pauseDownloading() {
-        logger.info("PAUSING: Thread: " + Thread.currentThread().getName());
-        state.setPaused(true);
-        futures.forEach(future -> future.cancel(true));
-        futures = Collections.emptyList();
-
+        logger.info("CLIENT: pausing");
         stateManager.persist(state);
-        freeAllResources();
+
+        stop();
     }
 
     /**
@@ -109,23 +78,18 @@ public class FileClient extends CommunicationBase {
      * Free all resources
      */
     public void cancelDownloading() {
-        logger.info("Thread: " + Thread.currentThread().getName());
-        freeAllResources();
+        logger.info("CLIENT: cancelling");
         fileAccessor.deleteFile();
+        stateManager.deleteBackup();
+
+        state = TransferState.createDefault();
+        shutDown();
     }
 
     public void resumeDownloading() {
-        logger.info("Thread: " + Thread.currentThread().getName());
-        state.setPaused(false);
-
+        logger.info("CLIENT: resuming");
         openSockets();
-
-        sockets.forEach(socket ->
-                futures.add(executorService
-                            .submit(new RequestFileTask(fileAccessor,
-                                    socket,
-                                    chunkRegistry.getFileChunks(),
-                                    chunkRegistry.getWritten()))));
+        submitTasksAndAwait();
     }
 
     public boolean resumeAvailable() {
@@ -141,7 +105,56 @@ public class FileClient extends CommunicationBase {
     }
 
     public int addAndGetElapsed() {
-        return state.addAndGetElapsed();
+        return state != null ? state.addAndGetElapsed() : 0;
+    }
+
+    public int getElapsed() {
+        return state != null ? state.getElapsed() : 0;
+    }
+
+    private boolean submitTasksAndAwait() {
+        executorService = Executors.newCachedThreadPool();
+        CompletionService<Boolean> completionService = new ExecutorCompletionService<>(executorService);
+
+        fileAccessor = new FileAccessor(new File(state.getFullPath()), "rw");
+
+        try {
+            sockets.forEach(socket ->
+                    futures.add(completionService.submit(new RequestFileTask(fileAccessor,
+                            socket,
+                            chunkRegistry.getFileChunks())))
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.error(e);
+            return false;
+        }
+
+        logger.info("CLIENT: tasks submitted");
+
+        boolean successfullyDownloaded = true;
+
+        for (int i = 0; i < state.getSocketCount(); i++) {
+            try {
+                Future<Boolean> done = completionService.take();
+                done.get();
+
+            } catch (CancellationException | InterruptedException | ExecutionException e) {
+                logger.error(e);
+                successfullyDownloaded = false;
+            }
+        }
+
+        if (successfullyDownloaded) {
+            stateManager.deleteBackup();
+            logger.info("CLIENT: download successful");
+            shutDown();
+        } else {
+            stateManager.persist(state);
+            logger.info("CLIENT: download unsuccessful");
+        }
+
+        return successfullyDownloaded;
     }
 
     private void openConnection() {
@@ -150,11 +163,11 @@ public class FileClient extends CommunicationBase {
             dis = new DataInputStream(managementSocket.getInputStream());
             dos = new DataOutputStream(managementSocket.getOutputStream());
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error(e);
             return;
         }
 
-        logger.info("Connected to " + Config.SERVER_ADDRESS + " on " + Config.SERVER_PORT);
+        logger.info("CLIENT: Connected to " + Config.SERVER_ADDRESS + " on " + Config.SERVER_PORT);
     }
 
     private void requestInfo() {
@@ -162,11 +175,11 @@ public class FileClient extends CommunicationBase {
             dos.writeUTF(Dialect.REQUEST_INFO);
             dos.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e);
             return;
         }
 
-        logger.info("Client requested info");
+        logger.info("CLIENT: requested info");
     }
 
     private void waitAndProcessInfo(int socketCount, String directory) {
@@ -179,49 +192,55 @@ public class FileClient extends CommunicationBase {
             fileLength = dis.readInt();
             chunkSize = dis.readInt();
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error(e);
             return;
         }
 
-        logger.info("Client obtained info");
+        logger.info("CLIENT: obtained info");
 
-        state = new TransferState(directory, fileName, fileLength, chunkSize, -1, 0);
+        state = new TransferState(directory, fileName, fileLength,
+                chunkSize, -1, 0, socketCount, serverTransferPort);
         chunkRegistry = FileChunkRegistry.fromState(state);
-        state.setSocketCount(socketCount);
-        state.setServerTransferPort(serverTransferPort);
 
-        fileAccessor = new FileAccessor(new File(directory + fileName), "rw");
-        logger.info("Client processed info");
+        logger.info("CLIENT: processed info");
     }
 
     private void openSockets() {
+        sockets = new ArrayList<>();
+
         for (int i = 0; i < state.getSocketCount(); i++) {
             try {
                 sockets.add(new Socket(Config.SERVER_ADDRESS, state.getServerTransferPort()));
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (Exception e) {
+                logger.error(e);
             }
         }
 
-        logger.info("Client opened " + state.getSocketCount() + " transfer sockets on " + state.getServerTransferPort());
+        logger.info("Client opened " + state.getSocketCount() + " transfer sockets " +
+                    "on " + state.getServerTransferPort());
     }
 
-    private void freeAllResources() {
-        logger.info("Client freed all resources");
-        logger.info("Thread: " + Thread.currentThread().getName());
+    private void stop() {
+        futures.forEach(future -> future.cancel(true));
+
+        logger.info("CLIENT: stopped");
+    }
+
+    private void shutDown() {
         futures.forEach(future -> future.cancel(true));
         executorService.shutdownNow();
-
         closeDataStreams();
 
         sockets.forEach(socket -> {
             try {
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e);
             }
         });
 
         fileAccessor.close();
+
+        logger.info("CLIENT: shutdown");
     }
 }
