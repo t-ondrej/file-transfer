@@ -63,7 +63,6 @@ public class FileChunkRegistry {
         BlockingQueue<FileChunk> chunks = new LinkedBlockingDeque<>();
 
         int fileChunkCount = fileLength > chunkSize ? fileLength / chunkSize : 0;
-
         int fileResidue = fileLength % chunkSize;
 
         for (int i = 0; i < fileChunkCount; i++)

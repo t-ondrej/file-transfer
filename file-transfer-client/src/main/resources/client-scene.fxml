@@ -10,7 +10,8 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.VBox?>
 
-<Pane prefHeight="357.0" prefWidth="734.0" style="-fx-background-color: #ecf0f1;" stylesheets="@client-scene.css" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sk.upjs.ics.ui.controllers.ClientSceneController">
+<?import javafx.scene.layout.StackPane?>
+<StackPane fx:id="containerStackPane" prefHeight="357.0" prefWidth="734.0" style="-fx-background-color: #ecf0f1;" stylesheets="@client-scene.css" xmlns="http://javafx.com/javafx/8.0.141" xmlns:fx="http://javafx.com/fxml/1" fx:controller="sk.upjs.ics.ui.controllers.ClientSceneController">
    <children>
       <VBox alignment="TOP_CENTER" prefHeight="357.0" prefWidth="734.0">
          <children>
@@ -71,4 +72,4 @@
          </padding>
       </VBox>
    </children>
-</Pane>
+</StackPane>

@@ -9,12 +9,23 @@
     -fx-primary-color: #2980b9;
 }
 
+.jfx-dialog {
+    -fx-font-smoothing-type: gray;
+    -fx-font-family: 'FontAwesome';
+    -fx-font-size: 20px;
+}
+
+.jfx-dialog-layout {
+    -fx-background-color: #ecf0f1;
+}
+
+
 .label {
     -fx-font-size: 16px;
     -fx-opacity: 0.45;
 }
 
-.choose-directory-jfx-button {
+.choose-directory-jfx-button, .okay-button {
     -fx-background-color: transparent;
     -fx-text-fill: -fx-primary-color;
 }

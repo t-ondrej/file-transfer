@@ -2,14 +2,19 @@ package sk.upjs.ics.ui.controllers;
 
 import com.google.inject.Inject;
 import com.jfoenix.controls.JFXButton;
+import com.jfoenix.controls.JFXDialog;
+import com.jfoenix.controls.JFXDialogLayout;
 import com.jfoenix.controls.JFXSlider;
 import javafx.application.Platform;
 import javafx.concurrent.Service;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 import org.apache.log4j.Logger;
@@ -20,6 +25,7 @@ import sun.rmi.runtime.Log;
 import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
+import java.util.Stack;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -28,6 +34,7 @@ import java.util.TimerTask;
  */
 public class ClientSceneController implements Initializable {
 
+    @FXML private StackPane containerStackPane;
     @FXML private JFXButton startButton;
     @FXML private JFXButton chooseDirectoryButton;
     @FXML private JFXSlider socketCountSlider;
@@ -80,12 +87,7 @@ public class ClientSceneController implements Initializable {
 
         logger.info("GUI: download service created");
 
-        downloadService.setOnSucceeded((event) -> {
-            if (downloadService.getValue())
-                updateComponentsDefault();
-            progressBar.setProgress(fileClient.getProgress());
-            timer.cancel();
-        });
+        setOnDownloadSucceed(downloadService);
 
         logger.info("GUI: download service onSucceded set");
 
@@ -113,17 +115,19 @@ public class ClientSceneController implements Initializable {
         addTimerSchedule();
         updateComponentsResumed();
 
-        new Service<Void>() {
-            protected Task<Void> createTask() {
-                return new Task<Void>() {
-                    protected Void call() throws Exception {
-                        fileClient.resumeDownloading();
-
-                        return null;
+        Service<Boolean> resumeService = new Service<Boolean>() {
+            protected Task<Boolean> createTask() {
+                return new Task<Boolean>() {
+                    protected Boolean call() throws Exception {
+                        return fileClient.resumeDownloading();
                     }
                 };
             }
-        }.start();
+        };
+
+        setOnDownloadSucceed(resumeService);
+
+        resumeService.start();
     }
 
     @FXML
@@ -233,5 +237,28 @@ public class ClientSceneController implements Initializable {
 
     private void updateComponentsDefault() {
         updateComponentsCancelled();
+    }
+
+    private void showDialog(String headerText) {
+        JFXDialogLayout content = new JFXDialogLayout();
+        content.setBody(new Text(headerText));
+
+        JFXDialog dialog = new JFXDialog(containerStackPane, content, JFXDialog.DialogTransition.CENTER);
+        JFXButton button = new JFXButton("Okay");
+        button.getStyleClass().add("okay-button");
+
+        button.setOnAction((event) -> dialog.close());
+        content.setActions(button);
+        dialog.show();
+    }
+
+    private void setOnDownloadSucceed(Service<Boolean> service) {
+        service.setOnSucceeded((event) -> {
+            if (service.getValue()) {
+                showDialog("Success!");
+                updateComponentsDefault();
+            }
+            timer.cancel();
+        });
     }
 }

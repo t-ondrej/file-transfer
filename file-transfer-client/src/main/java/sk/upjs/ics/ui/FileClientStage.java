@@ -43,6 +43,6 @@ public class FileClientStage extends Application {
     public void stop() throws Exception {
         super.stop();
         Platform.exit();
-        System.exit(0);
+        System.exit(-1);
     }
 }

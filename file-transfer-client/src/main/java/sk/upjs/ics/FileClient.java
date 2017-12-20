@@ -39,6 +39,7 @@ public class FileClient extends CommunicationBase {
         if (stateManager.existsPrevious()) {
             state = stateManager.getLastState();
             chunkRegistry = FileChunkRegistry.fromState(state);
+            fileAccessor = new FileAccessor(new File(state.getFullPath()), "rw");
         } else {
             state = TransferState.createDefault();
         }
@@ -86,10 +87,10 @@ public class FileClient extends CommunicationBase {
         shutDown();
     }
 
-    public void resumeDownloading() {
+    public boolean resumeDownloading() {
         logger.info("CLIENT: resuming");
         openSockets();
-        submitTasksAndAwait();
+        return submitTasksAndAwait();
     }
 
     public boolean resumeAvailable() {
@@ -198,6 +199,8 @@ public class FileClient extends CommunicationBase {
 
         logger.info("CLIENT: obtained info");
 
+        if (stateManager.existsPrevious())
+                stateManager.deleteBackup();
         state = new TransferState(directory, fileName, fileLength,
                 chunkSize, -1, 0, socketCount, serverTransferPort);
         chunkRegistry = FileChunkRegistry.fromState(state);
@@ -227,7 +230,7 @@ public class FileClient extends CommunicationBase {
     }
 
     private void shutDown() {
-        futures.forEach(future -> future.cancel(true));
+        stop();
         executorService.shutdownNow();
         closeDataStreams();
 

@@ -39,29 +39,24 @@ public class RequestFileTask extends CommunicationBase implements Callable<Boole
 
     @Override
     public Boolean call() throws Exception {
-        boolean s = true;
+        boolean success = true;
         try {
             while (true) {
-
                 if (Thread.currentThread().isInterrupted()) {
-                    s = false;
+                    success = false;
                     break;
                 }
 
-            //    System.out.println("1");
                 FileChunk chunk = chunks.take();
-
                 if (chunk.isPoisonPill()) {
                     return true;
                 }
-              //  System.out.println("2");
+
                 requestFileChunk(chunk);
-              //  System.out.println("3");
                 byte[] buffer = new byte[chunk.getLength()];
                 dis.read(buffer, 0, chunk.getLength());
-              //  System.out.println("4");
+
                 fileAccessor.write(chunk.getOffset(), buffer);
-            //    System.out.println("5");
             }
 
         } finally {
@@ -69,7 +64,7 @@ public class RequestFileTask extends CommunicationBase implements Callable<Boole
             fileAccessor.close();
         }
 
-        return s;
+        return success;
     }
 
     private void requestListening() throws IOException {
